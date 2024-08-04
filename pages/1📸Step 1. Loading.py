@@ -1,3 +1,4 @@
+# https://towardsdatascience.com/how-to-cluster-images-based-on-visual-similarity-cd6e7209fe34
 import streamlit as st
 from streamlit_extras.stateful_button import button
 from utils import streamlit_components, dataset_processing
@@ -89,11 +90,11 @@ feat = feat.reshape(-1,4096)
 # st.info(feat.shape)
 # (210, 4096)
 
-# get the unique labels (from the flower_labels.csv)
-df = pd.read_csv('./images/flower_images/flower_images/flower_labels.csv')
-label = df['label'].tolist()
-unique_labels = list(set(label))
-# st.text(unique_labels)
+# # get the unique labels (from the flower_labels.csv)
+# df = pd.read_csv('./images/flower_images/flower_images/flower_labels.csv')
+# label = df['label'].tolist()
+# unique_labels = list(set(label))
+# # st.text(unique_labels)
 
 # Dimensionality Reduction (PCA)
 # Since our feature vector has over 4,000 dimensions, We can't simply just shorten the list by 
@@ -106,7 +107,7 @@ unique_labels = list(set(label))
 # The number of dimensions to reduce down to is up to you and I'm sure there's a method for finding the best number of 
 # components to use, but for this case, I just chose 100 as an arbitrary number.
 
-pca = PCA(n_components=100, random_state=22)
+pca = PCA(n_components=43, random_state=22)
 pca.fit(feat)
 x = pca.transform(feat)
 
@@ -120,10 +121,12 @@ st.write(f"Components after PCA: {pca.n_components}")
 # This algorithm will allow us to group our feature vectors into k clusters. Each cluster should contain 
 # images that are visually similar. In this case, we know there are 10 different species of flowers so we can have k = 10.
 
-kmeans = KMeans(n_clusters=len(unique_labels),random_state=22)
+unique_labels = 2
+
+kmeans = KMeans(n_clusters=unique_labels,random_state=22)
 kmeans.fit(x)
 
-st.write(kmeans.labels_)
+# st.write(kmeans.labels_)
 
 # Each label in this list is a cluster identifier for each image in our dataset. 
 # The order of the labels is parallel to the list of filenames for each image. This way we can group the images into their clusters.
@@ -138,19 +141,16 @@ for file, cluster in zip(filenames,kmeans.labels_):
         groups[cluster].append(file)
         
 st.write(groups[0])
-
+view_all_clusters = st.checkbox("View all clusters", value=True)
 
 # function that lets you view a cluster (based on identifier)        
 def view_cluster(cluster):
-    plt.figure(figsize = (25,25));
-    # gets the list of filenames for a cluster
-    # files = groups[cluster]
+    # Get the list of filenames for a cluster
     files = groups.get(cluster, [])
-    # only allow up to 30 images to be shown at a time
+    
+    # Limit to 30 images if there are more
     if len(files) > 30:
-        print(f"Clipping cluster size from {len(files)} to 30")
-        files = files[:29]
-    # plot each image in the cluster
+        files = files[:30]
     
     # Set up a grid layout
     num_images = len(files)
@@ -161,27 +161,83 @@ def view_cluster(cluster):
     fig, axs = plt.subplots(rows, cols, figsize=(25, 25))
     axs = axs.flatten()
     
-    
+    # Plot each image in the cluster
     for index, file in enumerate(files):
-        plt.subplot(10,10,index+1);
-        img = tf.keras.utils.load_img(file)
-        img = np.array(img)
-        plt.imshow(img)
-        plt.axis('off')
-        
- 
-    for index, file in enumerate(files):
-        img = tf.keras.utils.load_img(file)
-        img = np.array(img)
-        axs[index].imshow(img)
-        axs[index].axis('off')
+        st.write(f"Loading image: {file}")
+
+        try:
+            img = tf.keras.utils.load_img(file)
+            img = np.array(img)
+            axs[index].imshow(img)
+            axs[index].axis('off')
+        except Exception as e:
+            st.write(f"Error loading image {file}: {e}")
+            axs[index].axis('off')
 
     # Hide any remaining subplots that aren't used
-    for i in range(index + 1, len(axs)):
+    for i in range(len(files), len(axs)):
         axs[i].axis('off')
 
     # Display the grid in Streamlit
     st.pyplot(fig)
+
+def view_all_clusters_images11():
+    fig, axs = plt.subplots(nrows=10, ncols=10, figsize=(25, 25))
+    axs = axs.flatten()
     
-selected_cluster = st.selectbox("Select Cluster", list(groups.keys()))
-view_cluster(selected_cluster)
+    all_files = [file for cluster_files in groups.values() for file in cluster_files]
+    num_images = len(all_files)
+    
+    for index, file in enumerate(all_files):
+        if index >= len(axs):
+            break
+        img = tf.keras.utils.load_img(file)
+        img = np.array(img)
+        axs[index].imshow(img)
+        axs[index].axis('off')
+    
+    # Hide any remaining subplots that aren't used
+    for i in range(index + 1, len(axs)):
+        axs[i].axis('off')
+    
+    st.pyplot(fig)
+
+
+def view_all_clusters_images():
+    # fig, axs = plt.subplots(nrows=10, ncols=1, figsize=(55, 50))
+    # axs = axs.flatten()
+    
+    cluster_names = sorted(groups.keys())
+    
+    for i, cluster in enumerate(cluster_names):
+        st.write(f"Cluster {cluster}: {len(groups[cluster])} images")
+        files = groups[cluster]
+        
+        num_images = len(files)
+        cols = 5
+        rows = (num_images // cols) + 1 if num_images % cols != 0 else num_images // cols
+        cluster_fig, cluster_axs = plt.subplots(rows, cols, figsize=(3, 3 * rows))
+        cluster_axs = cluster_axs.flatten()
+        
+        for j, file in enumerate(files):
+            try:
+                img = tf.keras.utils.load_img(file)
+                img = np.array(img)
+                cluster_axs[j].imshow(img)
+                cluster_axs[j].axis('off')
+            except Exception as e:
+                st.write(f"Error loading image {file}: {e}")
+                cluster_axs[j].axis('off')
+        
+        for k in range(len(files), len(cluster_axs)):
+            cluster_axs[k].axis('off')
+        
+        st.pyplot(cluster_fig)
+        st.divider()  # Two-line space between clusters
+
+
+if view_all_clusters:
+    view_all_clusters_images()
+# else:
+#     selected_cluster = st.selectbox("Select Cluster", list(groups.keys()))
+#     view_cluster(selected_cluster)

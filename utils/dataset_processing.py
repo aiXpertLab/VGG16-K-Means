@@ -9,7 +9,7 @@ from sklearn.svm import SVC
 from utils.face_processing import load_faces_from_train_val_prod, load_faces_prod, load_faces_with_path
 
 def loading_data():
-    path = "./images/flower_images/flower_images"
+    path = "./images/mv"
     # change the working directory to the path where the images are located
 
     # this list holds all the image filename
@@ -19,7 +19,8 @@ def loading_data():
     with os.scandir(path) as files:
     # loops through each file in the directory
         for file in files:
-            if file.name.endswith('.png'):
+            image_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff', '.webp')
+            if file.name.endswith(image_extensions):
             # adds only the image files to the flowers list
                 flowers.append(os.path.join(path, file.name))
 
